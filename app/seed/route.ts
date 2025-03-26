@@ -87,13 +87,26 @@ async function seedDays(userId: number) {
     )
   );
 
-  return insertedDays.map((result) => ({
-    id: result.rows[0]?.id,
-    date: result.rows[0]?.date,
-  })).filter((day) => day.id && day.date);
+  const days = insertedDays
+    .map((result) => ({
+      id: result.rows[0]?.id,
+      date: result.rows[0]?.date,
+    }))
+    .filter((day) => day.id && day.date);
+
+  // 格式化 dayMap 的键为 YYYY-MM-DD
+  const dayMap = days.reduce((map, day) => {
+    map[new Date(day.date).toISOString().split('T')[0]] = day.id;
+    return map;
+  }, {} as { [date: string]: number });
+
+  console.log('Day map YYYY:', dayMap); // 添加日志
+  return dayMap;
 }
 
 async function seedChats(dayMap: { [date: string]: number }) {
+  console.log('Day map:', dayMap);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chats (
       id SERIAL PRIMARY KEY,
@@ -110,6 +123,7 @@ async function seedChats(dayMap: { [date: string]: number }) {
   const insertedChats = await Promise.all(
     testChats.map((chat) => {
       const dayId = dayMap[chat.dayDate];
+      console.log(`Processing chat for date ${chat.dayDate}, dayId: ${dayId}`); // 添加日志
       if (!dayId) return null;
 
       return pool.query(
@@ -127,6 +141,7 @@ async function seedChats(dayMap: { [date: string]: number }) {
 }
 
 async function seedTodos(dayMap: { [date: string]: number }) {
+  console.log('Day map:', dayMap);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS todos (
       id SERIAL PRIMARY KEY,
@@ -140,6 +155,7 @@ async function seedTodos(dayMap: { [date: string]: number }) {
   const insertedTodos = await Promise.all(
     testTodos.map((todo) => {
       const dayId = dayMap[todo.dayDate];
+      console.log(`Processing todo for date ${todo.dayDate}, dayId: ${dayId}`); // 添加日志
       if (!dayId) return null;
 
       return pool.query(
@@ -171,12 +187,7 @@ export async function GET() {
     console.log('User seeded successfully.');
 
     // Seed days
-    const days = await seedDays(userId);
-    const dayMap = days.reduce((map, day) => {
-      map[day.date] = day.id;
-      return map;
-    }, {} as { [date: string]: number });
-
+    const dayMap = await seedDays(userId);
     console.log('Days seeded successfully.');
 
     // Seed chats and todos
