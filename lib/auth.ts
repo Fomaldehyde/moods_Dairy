@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
 // 从请求中获取用户ID

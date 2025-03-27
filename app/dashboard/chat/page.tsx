@@ -18,9 +18,11 @@ const moodEmojis: Record<string, { emoji: string, label: string, id: number }> =
 };
 
 interface DiaryEntry {
-  id: string;
+  id: number;
   content: string;
-  timestamp: Date;
+  dayId: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface DayMood {
@@ -30,7 +32,7 @@ interface DayMood {
 
 export default function ChatPage() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get('date');
+  const dateParam = searchParams.get('dayId');
   const [selectedDate, setSelectedDate] = useState(() => {
     return dateParam ? new Date(dateParam) : new Date();
   });
@@ -75,35 +77,12 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        // 实际应用中从API获取数据
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 获取选中日期的年月日部分（避免小时分钟影响）
-        const year = selectedDate.getFullYear();
-        const month = selectedDate.getMonth();
-        const day = selectedDate.getDate();
-        const dateOnly = new Date(year, month, day);
-        
-        // 模拟数据
-        const mockEntries: DiaryEntry[] = [
-          {
-            id: '1',
-            content: '今天天气很好，心情愉快！',
-            timestamp: new Date(dateOnly.getTime() + 9 * 60 * 60 * 1000 + 30 * 60 * 1000),
-          },
-          {
-            id: '2',
-            content: '下午开会很累，但是进展顺利。',
-            timestamp: new Date(dateOnly.getTime() + 15 * 60 * 60 * 1000 + 45 * 60 * 1000),
-          },
-          {
-            id: '3',
-            content: '晚上和朋友聚餐，聊得很开心！',
-            timestamp: new Date(dateOnly.getTime() + 20 * 60 * 60 * 1000 + 15 * 60 * 1000),
-          },
-        ];
-        
-        setDiaryEntries(mockEntries);
+        // 直接使用 dayId=1 获取聊天记录
+        const response = await fetch('/api/chat?dayId=1');
+        if (!response.ok) throw new Error('获取聊天记录失败');
+        const data = await response.json();
+        console.log('获取到的聊天记录:', data.chats);
+        setDiaryEntries(data.chats);
       } catch (error) {
         console.error('获取日记失败:', error);
       }
@@ -120,30 +99,23 @@ export default function ChatPage() {
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     
-    // 创建新条目
-    const newEntry: DiaryEntry = {
-      id: Date.now().toString(),
-      content: message.trim(),
-      timestamp: new Date(),
-    };
-    
-    // 添加到列表
-    setDiaryEntries([...diaryEntries, newEntry]);
-    
-    // 重置输入
-    setMessage('');
-    
-    // 实际应用中会发送到API
     try {
-      // await fetch('/api/diary', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...newEntry,
-      //     date: selectedDate.toISOString()
-      //   }),
-      // });
-      console.log('日记已保存', { ...newEntry, date: selectedDate });
+      // 直接发送到 dayId=1
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: message.trim(),
+          dayId: 1
+        }),
+      });
+
+      if (!response.ok) throw new Error('保存聊天记录失败');
+      const newEntry = await response.json();
+      console.log('新发送的消息:', newEntry);
+      
+      setDiaryEntries([...diaryEntries, newEntry]);
+      setMessage('');
     } catch (error) {
       console.error('保存日记失败:', error);
     }
@@ -207,9 +179,9 @@ export default function ChatPage() {
               {diaryEntries.map((entry) => (
                 <div key={entry.id} className="flex flex-col max-w-[80%] ml-auto bg-blue-100 rounded-lg p-3">
                   <div className="flex items-center justify-end mb-1">
-                    <span className="text-xs text-gray-500">
-                      {format(entry.timestamp, 'HH:mm')}
-                    </span>
+                    <div className="text-xs text-gray-500">
+                      {format(new Date(entry.createdAt), 'HH:mm')}
+                    </div>
                   </div>
                   <p>{entry.content}</p>
                 </div>
