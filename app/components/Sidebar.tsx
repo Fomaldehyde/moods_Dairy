@@ -7,13 +7,14 @@ import {
   CalendarIcon, 
   ChatBubbleLeftIcon, 
   CheckCircleIcon, 
-  ArrowRightOnRectangleIcon 
+  ArrowLeftStartOnRectangleIcon 
 } from '@heroicons/react/24/outline';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import Cookies from 'js-cookie';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -21,10 +22,33 @@ export default function Sidebar() {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get('date');
   
+  // 用户信息状态
+  const [userName, setUserName] = useState<string>('用户');
+  
   // 如果URL中有日期参数则使用它，否则使用当前日期
   const [selectedDate, setSelectedDate] = useState(() => {
     return dateParam ? new Date(dateParam) : new Date();
   });
+  
+  // 获取用户信息
+  useEffect(() => {
+    // 从localStorage中获取用户信息
+    const getUserInfo = () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const userStr = localStorage.getItem('user');
+          if (userStr) {
+            const userData = JSON.parse(userStr);
+            setUserName(userData.name || '用户');
+          }
+        } catch (error) {
+          console.error('获取用户信息失败:', error);
+        }
+      }
+    };
+    
+    getUserInfo();
+  }, []);
   
   // 当URL日期参数变化时更新选中日期
   useEffect(() => {
@@ -32,9 +56,6 @@ export default function Sidebar() {
       setSelectedDate(new Date(dateParam));
     }
   }, [dateParam]);
-  
-  // 模拟用户数据，实际应用中从会话或API获取
-  const userName = "用户名";
 
   const handleDateChange = (date: Date | null) => {
     if (date) {
@@ -53,7 +74,12 @@ export default function Sidebar() {
   };
 
   const handleLogout = () => {
-    // 实现登出逻辑
+    // 实现真正的登出逻辑
+    // 清除localStorage中的用户信息
+    localStorage.removeItem('user');
+    // 清除cookie中的token
+    Cookies.remove('token');
+    // 重定向到登录页面
     router.push('/login');
   };
 
@@ -136,7 +162,7 @@ export default function Sidebar() {
           onClick={handleLogout}
           className="flex items-center p-2 w-full text-left text-red-500 hover:bg-red-50 rounded-lg"
         >
-          <ArrowRightOnRectangleIcon className="h-5 w-5 mr-2" />
+          <ArrowLeftStartOnRectangleIcon className="h-5 w-5 mr-2" />
           登出
         </button>
       </div>
