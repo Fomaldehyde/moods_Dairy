@@ -15,31 +15,59 @@ model User {
   name     String
   email    String    @unique
   password String
-  diaries  Diary[]
-  todos    Todo[]
+  days     Day[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Diary {
-  id        String   @id @default(cuid())
-  content   String
-  mood      String   // 存储心情图标名称或ID
-  date      DateTime @default(now())
+model Day {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  moodId    Int?
+  mood      Mood?    @relation(fields: [moodId], references: [id])
+  chats     Chat[]
+  todos     Todo[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, userId])
+  @@index([date])
+  @@map("days")
+}
+
+model Mood {
+  id     Int      @id @default(autoincrement())
+  emoji  String
+  label  String
+  value  String   @unique
+  days   Day[]
+
+  @@map("moods")
+}
+
+model Chat {
+  id        Int      @id @default(autoincrement())
+  content   String
+  dayId     Int
+  day       Day      @relation(fields: [dayId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("chats")
+  @@index([dayId])
 }
 
 model Todo {
-  id          String   @id @default(cuid())
-  title       String
-  completed   Boolean  @default(false)
-  date        DateTime @default(now())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comment     String?  // 任务评价
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  title     String
+  completed Boolean  @default(false)
+  dayId     Int
+  day       Day      @relation(fields: [dayId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("todos")
+  @@index([dayId])
 } 
