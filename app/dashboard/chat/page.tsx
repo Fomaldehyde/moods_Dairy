@@ -8,13 +8,13 @@ import { zhCN } from 'date-fns/locale';
 // 心情图标映射
 const moodEmojis: Record<string, { emoji: string, label: string, id: number }> = {
   HAPPY: { emoji: "😊", label: "开心", id: 1 },
-  SAD: { emoji: "😢", label: "难过", id: 2 },
-  ANGRY: { emoji: "😡", label: "生气", id: 3 },
-  NEUTRAL: { emoji: "😐", label: "平静", id: 4 },
-  EXCITED: { emoji: "🤩", label: "兴奋", id: 5 },
-  TIRED: { emoji: "😫", label: "疲惫", id: 6 },
-  PEACEFUL: { emoji: "😌", label: "平和", id: 7 },
-  ANXIOUS: { emoji: "😰", label: "焦虑", id: 8 },
+  EXCITED: { emoji: "🤩", label: "兴奋", id: 2 },
+  SAD: { emoji: "😢", label: "难过", id: 5 },
+  ANGRY: { emoji: "😡", label: "生气", id: 4 },
+  NEUTRAL: { emoji: "😐", label: "平和", id: 3 },
+  TIRED: { emoji: "😫", label: "疲惫", id: 8 },
+  PEACEFUL: { emoji: "😌", label: "平和", id: 6 },
+  ANXIOUS: { emoji: "😰", label: "焦虑", id: 7 },
 };
 
 interface DiaryEntry {
@@ -38,7 +38,8 @@ export default function ChatPage() {
       return parseISO(dateParam);
     }
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // 使用 UTC 时间，避免时区问题
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   });
   
   const [message, setMessage] = useState('');
@@ -58,12 +59,42 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchMood = async () => {
       try {
+        // 从 localStorage 获取用户信息
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.error('用户未登录');
+          return;
+        }
+        const user = JSON.parse(userStr);
+
+        if (!user.id) {
+          console.error('用户信息不完整');
+          return;
+        }
+
+        // 使用 UTC 日期字符串
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const response = await fetch(`/api/mood?date=${dateStr}`);
+        console.log('当前日期:', dateStr, 'UTC时间:', selectedDate.toISOString());
+        const response = await fetch(`/api/mood?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
         const data = await response.json();
-        setDayMood(data);
+        
+        if (data.mood) {
+          // 根据 moodId 找到对应的表情
+          const moodEntry = Object.values(moodEmojis).find(value => value.id === data.mood);
+          if (moodEntry) {
+            console.log('找到心情:', moodEntry);
+            setDayMood({ mood: moodEntry.emoji, moodId: moodEntry.id });
+          } else {
+            console.log('未找到对应的心情:', data.mood);
+            setDayMood({ mood: null, moodId: null });
+          }
+        } else {
+          console.log('没有心情数据');
+          setDayMood({ mood: null, moodId: null });
+        }
       } catch (error) {
         console.error('获取心情失败:', error);
+        setDayMood({ mood: null, moodId: null });
       }
     };
 
@@ -214,16 +245,43 @@ export default function ChatPage() {
     }
   };
 
-  const handleMoodSelect = async (moodKey: string) => {
+  const handleMoodSelect = async (moodKey: keyof typeof moodEmojis) => {
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await fetch(`/api/mood?date=${dateStr}`, {
+      // 从 localStorage 获取用户信息
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        console.error('用户未登录');
+        return;
+      }
+      const user = JSON.parse(userStr);
+
+      if (!user.id) {
+        console.error('用户信息不完整');
+        return;
+      }
+
+      const selectedMood = moodEmojis[moodKey];
+      console.log('选择的心情:', selectedMood);
+
+      const response = await fetch('/api/mood', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moodId: moodEmojis[moodKey].id }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          moodId: selectedMood.id,
+          userId: user.id
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error('更新心情失败');
+      }
+
       const data = await response.json();
-      setDayMood(data);
+      console.log('心情更新成功:', data);
+      setDayMood({ mood: selectedMood.emoji, moodId: selectedMood.id });
       setShowMoodSelector(false);
     } catch (error) {
       console.error('更新心情失败:', error);
@@ -250,7 +308,7 @@ export default function ChatPage() {
                 {Object.entries(moodEmojis).map(([mood, { emoji, label }]) => (
                   <button
                     key={mood}
-                    onClick={() => handleMoodSelect(mood)}
+                    onClick={() => handleMoodSelect(mood as keyof typeof moodEmojis)}
                     className={`flex flex-col items-center p-2 rounded-lg ${
                       dayMood.mood === emoji ? 'bg-blue-100' : 'hover:bg-gray-100'
                     }`}

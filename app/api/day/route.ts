@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { parseISO } from 'date-fns';
 
 // 获取或创建指定日期的记录
 export async function GET(request: Request) {
@@ -24,8 +23,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 });
     }
 
-    // 将日期字符串转换为 Date 对象
-    const dateObj = parseISO(date);
+    // 直接使用日期字符串，不进行时区转换
+    const dateObj = new Date(date);
     console.log('处理日期:', date);
     console.log('转换后的日期:', dateObj.toISOString());
     console.log('用户ID:', userId);
@@ -37,8 +36,8 @@ export async function GET(request: Request) {
           { userId: userId },
           {
             date: {
-              gte: new Date(date),
-              lt: new Date(new Date(date).setDate(new Date(date).getDate() + 1))
+              gte: dateObj,
+              lt: new Date(new Date(dateObj).setDate(dateObj.getDate() + 1))
             }
           }
         ]
