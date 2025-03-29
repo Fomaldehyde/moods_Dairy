@@ -23,6 +23,24 @@ interface TodoComment {
   updatedAt: string;
 }
 
+// 计算待办事项状态的颜色
+const getStatusColor = (todos: Todo[]): string => {
+  if (todos.length === 0) {
+    return 'bg-green-500'; // 没有待办事项显示绿色
+  }
+  
+  const completedCount = todos.filter(todo => todo.completed).length;
+  const totalCount = todos.length;
+  
+  if (completedCount === 0) {
+    return 'bg-red-500'; // 有待办事项但一个都没完成显示红色
+  } else if (completedCount === totalCount) {
+    return 'bg-green-500'; // 全部完成显示绿色
+  } else {
+    return 'bg-yellow-500'; // 部分完成显示黄色
+  }
+};
+
 export default function TodoPage() {
   const searchParams = useSearchParams();
   const dateParam = searchParams.get('date');
@@ -277,9 +295,12 @@ export default function TodoPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="bg-white rounded-lg shadow mb-4 p-4">
-        <h1 className="text-2xl font-bold">
-          {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">
+            {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })}
+          </h1>
+          <div className={`w-4 h-4 rounded-full ${getStatusColor(todos)}`}></div>
+        </div>
       </div>
       
       <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">

@@ -31,7 +31,7 @@ export async function GET() {
       const totalTodos = day.todos.length;
       const completedTodos = day.todos.filter((todo: { completed: boolean }) => todo.completed).length;
       
-      let status = 'red'; // 默认红色（未完成）
+      let status = 'grey'; // 默认红色（未完成）
       if (totalTodos === 0) {
         status = 'green'; // 如果没有待办事项，视为完成
       } else if (completedTodos === totalTodos) {
