@@ -77,14 +77,60 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        // 直接使用 dayId=1 获取聊天记录
-        const response = await fetch('/api/chat?dayId=1');
-        if (!response.ok) throw new Error('获取聊天记录失败');
-        const data = await response.json();
-        console.log('获取到的聊天记录:', data.chats);
-        setDiaryEntries(data.chats);
+        // 从 localStorage 获取用户信息
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.error('用户未登录');
+          return;
+        }
+        const user = JSON.parse(userStr);
+        console.log('当前用户:', user);
+
+        if (!user.id) {
+          console.error('用户信息不完整');
+          return;
+        }
+
+        // 1. 先获取或创建当天的 day 记录
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        console.log('获取日期记录:', dateStr);
+        
+        const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
+        const dayData = await dayResponse.json();
+        
+        if (!dayResponse.ok) {
+          console.error('获取日期记录失败:', dayData);
+          if (dayResponse.status === 404) {
+            console.error('用户不存在，请重新登录');
+            // 这里可以添加重定向到登录页面的逻辑
+            return;
+          }
+          throw new Error(dayData.error || '获取日期记录失败');
+        }
+        
+        console.log('获取到的日期记录:', dayData);
+        
+        if (!dayData.day) {
+          console.log('没有找到日期记录，显示空列表');
+          setDiaryEntries([]);
+          return;
+        }
+
+        // 2. 获取该 day 的聊天记录
+        console.log('获取聊天记录，dayId:', dayData.day.id);
+        const chatResponse = await fetch(`/api/chat?dayId=${dayData.day.id}`);
+        const chatData = await chatResponse.json();
+        
+        if (!chatResponse.ok) {
+          console.error('获取聊天记录失败:', chatData);
+          throw new Error(chatData.error || '获取聊天记录失败');
+        }
+        
+        console.log('获取到的聊天记录:', chatData.chats);
+        setDiaryEntries(chatData.chats || []);
       } catch (error) {
         console.error('获取日记失败:', error);
+        setDiaryEntries([]);
       }
     };
     
@@ -100,21 +146,62 @@ export default function ChatPage() {
     if (!message.trim()) return;
     
     try {
-      // 直接发送到 dayId=1
+      // 从 localStorage 获取用户信息
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        console.error('用户未登录');
+        return;
+      }
+      const user = JSON.parse(userStr);
+
+      if (!user.id) {
+        console.error('用户信息不完整');
+        return;
+      }
+
+      // 1. 先获取或创建当天的 day 记录
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      console.log('发送消息，获取日期记录:', dateStr);
+      
+      const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
+      const dayData = await dayResponse.json();
+      
+      if (!dayResponse.ok) {
+        console.error('获取日期记录失败:', dayData);
+        if (dayResponse.status === 404) {
+          console.error('用户不存在，请重新登录');
+          // 这里可以添加重定向到登录页面的逻辑
+          return;
+        }
+        throw new Error(dayData.error || '获取日期记录失败');
+      }
+      
+      console.log('获取到的日期记录:', dayData);
+      
+      if (!dayData.day) {
+        throw new Error('找不到对应的日期记录');
+      }
+
+      // 2. 发送聊天记录
+      console.log('发送聊天记录，dayId:', dayData.day.id);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: message.trim(),
-          dayId: 1
+          dayId: dayData.day.id
         }),
       });
 
-      if (!response.ok) throw new Error('保存聊天记录失败');
-      const newEntry = await response.json();
-      console.log('新发送的消息:', newEntry);
+      const responseData = await response.json();
       
-      setDiaryEntries([...diaryEntries, newEntry]);
+      if (!response.ok) {
+        console.error('保存聊天记录失败:', responseData);
+        throw new Error(responseData.error || '保存聊天记录失败');
+      }
+      
+      console.log('新发送的消息:', responseData);
+      setDiaryEntries([...diaryEntries, responseData]);
       setMessage('');
     } catch (error) {
       console.error('保存日记失败:', error);
