@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { parseISO } from 'date-fns';
 
 // 获取或创建指定日期的记录
 export async function GET(request: Request) {
@@ -23,30 +24,42 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 });
     }
 
-    // 将日期字符串转换为 Date 对象，并设置为当天的开始时间
-    const dateObj = new Date(date);
-    dateObj.setHours(0, 0, 0, 0);
-
-    console.log('处理日期:', dateObj.toISOString());
+    // 将日期字符串转换为 Date 对象
+    const dateObj = parseISO(date);
+    console.log('处理日期:', date);
+    console.log('转换后的日期:', dateObj.toISOString());
     console.log('用户ID:', userId);
 
-    // 查找或创建指定日期的记录
-    const day = await prisma.day.upsert({
+    // 查找指定日期的记录
+    const existingDay = await prisma.day.findFirst({
       where: {
-        date_userId: {
-          date: dateObj,
-          userId: userId
-        }
-      },
-      create: {
-        date: dateObj,
-        userId: userId
-      },
-      update: {}
+        AND: [
+          { userId: userId },
+          {
+            date: {
+              gte: new Date(date),
+              lt: new Date(new Date(date).setDate(new Date(date).getDate() + 1))
+            }
+          }
+        ]
+      }
     });
 
-    console.log('获取到的日期记录:', day);
-    return NextResponse.json({ day });
+    if (existingDay) {
+      console.log('找到已存在的日期记录:', existingDay);
+      return NextResponse.json({ day: existingDay });
+    }
+
+    // 如果记录不存在，创建新记录
+    const newDay = await prisma.day.create({
+      data: {
+        date: dateObj,
+        userId: userId
+      }
+    });
+
+    console.log('创建新的日期记录:', newDay);
+    return NextResponse.json({ day: newDay });
   } catch (error) {
     console.error('获取日期记录失败，详细错误:', error);
     if (error instanceof Error) {

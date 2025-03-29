@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 // 心情图标映射
@@ -32,9 +32,13 @@ interface DayMood {
 
 export default function ChatPage() {
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get('dayId');
+  const dateParam = searchParams.get('date');
   const [selectedDate, setSelectedDate] = useState(() => {
-    return dateParam ? new Date(dateParam) : new Date();
+    if (dateParam) {
+      return parseISO(dateParam);
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   });
   
   const [message, setMessage] = useState('');
@@ -43,17 +47,10 @@ export default function ChatPage() {
   const [dayMood, setDayMood] = useState<DayMood>({ mood: null, moodId: null });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 当URL中的日期参数变化时更新selectedDate
+  // 当 URL 中的日期参数变化时更新 selectedDate
   useEffect(() => {
     if (dateParam) {
-      // 处理YYYY-MM-DD格式的日期
-      if (dateParam.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const [year, month, day] = dateParam.split('-').map(Number);
-        setSelectedDate(new Date(year, month - 1, day));
-      } else {
-        // 兼容旧格式
-        setSelectedDate(new Date(dateParam));
-      }
+      setSelectedDate(parseISO(dateParam));
     }
   }, [dateParam]);
 
@@ -93,16 +90,20 @@ export default function ChatPage() {
 
         // 1. 先获取或创建当天的 day 记录
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('获取日期记录:', dateStr);
+        console.log('获取日期记录:', dateStr, '选中的日期:', selectedDate.toISOString());
         
-        const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
+        const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         const dayData = await dayResponse.json();
         
         if (!dayResponse.ok) {
           console.error('获取日期记录失败:', dayData);
           if (dayResponse.status === 404) {
             console.error('用户不存在，请重新登录');
-            // 这里可以添加重定向到登录页面的逻辑
             return;
           }
           throw new Error(dayData.error || '获取日期记录失败');
@@ -118,7 +119,12 @@ export default function ChatPage() {
 
         // 2. 获取该 day 的聊天记录
         console.log('获取聊天记录，dayId:', dayData.day.id);
-        const chatResponse = await fetch(`/api/chat?dayId=${dayData.day.id}`);
+        const chatResponse = await fetch(`/api/chat?dayId=${dayData.day.id}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         const chatData = await chatResponse.json();
         
         if (!chatResponse.ok) {
@@ -229,7 +235,7 @@ export default function ChatPage() {
       <div className="bg-white rounded-lg shadow mb-4 p-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">
-            {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })} 的日记
+            {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })}
           </h1>
           <div className="relative">
             <button
