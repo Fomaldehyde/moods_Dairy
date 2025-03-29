@@ -65,9 +65,22 @@ model Todo {
   completed Boolean  @default(false)
   dayId     Int
   day       Day      @relation(fields: [dayId], references: [id])
+  comments  TodoComment[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("todos")
   @@index([dayId])
+}
+
+model TodoComment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  todoId    Int
+  todo      Todo     @relation(fields: [todoId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("todo_comments")
+  @@index([todoId])
 } 

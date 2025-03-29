@@ -2,6 +2,7 @@
   "name": "my-app",
   "version": "0.1.0",
   "private": true,
+  "type": "commonjs",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -11,8 +12,10 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^6.5.0",
+    "@types/bcryptjs": "^2.4.6",
     "@types/js-cookie": "^3.0.6",
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
     "chart.js": "^4.4.8",
     "date-fns": "^4.1.0",
     "jose": "^6.0.10",
@@ -30,7 +33,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^20",
+    "@types/node": "^20.17.28",
     "@types/react": "^19",
     "@types/react-big-calendar": "^1.16.1",
     "@types/react-datepicker": "^6.2.0",
@@ -39,6 +42,11 @@
     "eslint-config-next": "15.2.4",
     "prisma": "^6.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

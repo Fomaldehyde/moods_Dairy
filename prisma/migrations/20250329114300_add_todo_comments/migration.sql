@@ -55,6 +55,17 @@ CREATE TABLE "todos" (
     CONSTRAINT "todos_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "todo_comments" (
+    "id" SERIAL NOT NULL,
+    "content" TEXT NOT NULL,
+    "todoId" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "todo_comments_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -73,6 +84,9 @@ CREATE INDEX "chats_dayId_idx" ON "chats"("dayId");
 -- CreateIndex
 CREATE INDEX "todos_dayId_idx" ON "todos"("dayId");
 
+-- CreateIndex
+CREATE INDEX "todo_comments_todoId_idx" ON "todo_comments"("todoId");
+
 -- AddForeignKey
 ALTER TABLE "days" ADD CONSTRAINT "days_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -84,3 +98,6 @@ ALTER TABLE "chats" ADD CONSTRAINT "chats_dayId_fkey" FOREIGN KEY ("dayId") REFE
 
 -- AddForeignKey
 ALTER TABLE "todos" ADD CONSTRAINT "todos_dayId_fkey" FOREIGN KEY ("dayId") REFERENCES "days"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "todo_comments" ADD CONSTRAINT "todo_comments_todoId_fkey" FOREIGN KEY ("todoId") REFERENCES "todos"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
