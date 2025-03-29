@@ -24,13 +24,13 @@ interface CalendarEvent {
   start: Date;
   end: Date;
   mood: string | null;
-  status: 'green' | 'yellow' | 'red';
+  status: 'green' | 'yellow' | 'red' | null;
 }
 
 interface CalendarData {
   date: string;
   mood: string | null;
-  status: 'green' | 'yellow' | 'red';
+  status: 'green' | 'yellow' | 'red' | null;
 }
 
 export default function CalendarPage() {
@@ -90,13 +90,15 @@ export default function CalendarPage() {
               <span className="text-xs">{event.mood}</span>
             </div>
           )}
-          <div 
-            className="w-3 h-3 rounded-full"
-            style={{
-              backgroundColor: event.status === 'green' ? '#4CAF50' : 
-                             event.status === 'yellow' ? '#FFC107' : '#F44336'
-            }}
-          />
+          {event.status && (
+            <div 
+              className="w-3 h-3 rounded-full"
+              style={{
+                backgroundColor: event.status === 'green' ? '#4CAF50' : 
+                               event.status === 'yellow' ? '#FFC107' : '#F44336'
+              }}
+            />
+          )}
         </div>
       </div>
     );

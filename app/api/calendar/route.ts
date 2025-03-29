@@ -31,13 +31,15 @@ export async function GET() {
       const totalTodos = day.todos.length;
       const completedTodos = day.todos.filter((todo: { completed: boolean }) => todo.completed).length;
       
-      let status = 'grey'; // 默认红色（未完成）
-      if (totalTodos === 0) {
-        status = 'green'; // 如果没有待办事项，视为完成
-      } else if (completedTodos === totalTodos) {
-        status = 'green'; // 全部完成
-      } else if (completedTodos > 0) {
-        status = 'yellow'; // 部分完成
+      let status = null; // 默认不显示颜色
+      if (totalTodos > 0) {
+        if (completedTodos === totalTodos) {
+          status = 'green'; // 全部完成
+        } else if (completedTodos > 0) {
+          status = 'yellow'; // 部分完成
+        } else {
+          status = 'red'; // 有待办事项但一个都没完成
+        }
       }
 
       return {
