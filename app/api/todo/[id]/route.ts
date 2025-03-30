@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Todo } from '@/app/lib/defination';
+
+type TodoUpdateData = Partial<Pick<Todo, 'title' | 'completed'>>;
 
 // 更新待办事项
 export async function PATCH(
@@ -18,7 +21,7 @@ export async function PATCH(
       );
     }
 
-    const updateData: any = {};
+    const updateData: TodoUpdateData = {};
     if (title !== undefined) updateData.title = title;
     if (completed !== undefined) updateData.completed = completed;
 

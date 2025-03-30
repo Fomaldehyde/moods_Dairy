@@ -4,18 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-
-// 心情图标映射
-const moodEmojis: Record<string, { emoji: string, label: string, id: number }> = {
-  HAPPY: { emoji: "😊", label: "开心", id: 1 },
-  EXCITED: { emoji: "🤩", label: "兴奋", id: 2 },
-  SAD: { emoji: "😢", label: "难过", id: 5 },
-  ANGRY: { emoji: "😡", label: "生气", id: 4 },
-  NEUTRAL: { emoji: "😐", label: "平和", id: 3 },
-  TIRED: { emoji: "😫", label: "疲惫", id: 8 },
-  PEACEFUL: { emoji: "😌", label: "平和", id: 6 },
-  ANXIOUS: { emoji: "😰", label: "焦虑", id: 7 },
-};
+import { moodEmojis } from '@/app/lib/mood';
 
 interface DiaryEntry {
   id: number;

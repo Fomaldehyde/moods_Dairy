@@ -22,24 +22,22 @@ async function main() {
     },
   });
 
-  // 创建心情选项
-  const moods = await Promise.all([
-    prisma.mood.create({ data: { emoji: '😊', label: '开心', value: 'HAPPY' } }),
-    prisma.mood.create({ data: { emoji: '😢', label: '难过', value: 'SAD' } }),
-    prisma.mood.create({ data: { emoji: '😡', label: '生气', value: 'ANGRY' } }),
-    prisma.mood.create({ data: { emoji: '😐', label: '平静', value: 'NEUTRAL' } }),
-    prisma.mood.create({ data: { emoji: '🤩', label: '兴奋', value: 'EXCITED' } }),
-    prisma.mood.create({ data: { emoji: '😫', label: '疲惫', value: 'TIRED' } }),
-    prisma.mood.create({ data: { emoji: '😌', label: '平和', value: 'PEACEFUL' } }),
-    prisma.mood.create({ data: { emoji: '😰', label: '焦虑', value: 'ANXIOUS' } }),
-  ]);
+  // 按顺序创建心情选项
+  await prisma.mood.create({ data: { emoji: '😢', label: '难过', value: 'SAD' } });
+  await prisma.mood.create({ data: { emoji: '😐', label: '平静', value: 'NEUTRAL' } });
+  await prisma.mood.create({ data: { emoji: '🤩', label: '兴奋', value: 'EXCITED' } });
+  await prisma.mood.create({ data: { emoji: '😡', label: '生气', value: 'ANGRY' } });
+  await prisma.mood.create({ data: { emoji: '😌', label: '平和', value: 'PEACEFUL' } });
+  await prisma.mood.create({ data: { emoji: '😰', label: '焦虑', value: 'ANXIOUS' } });
+  const happyMood = await prisma.mood.create({ data: { emoji: '😊', label: '开心', value: 'HAPPY' } });
+  await prisma.mood.create({ data: { emoji: '😫', label: '疲惫', value: 'TIRED' } });
 
   // 创建示例日期记录
   const day = await prisma.day.create({
     data: {
       date: new Date('2025-03-27'),
       userId: user.id,
-      moodId: moods[0].id, // 使用"开心"的心情
+      moodId: happyMood.id, // 使用"开心"的心情
     },
   });
 
