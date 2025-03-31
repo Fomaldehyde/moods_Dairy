@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 
 export async function GET(request: Request) {
   try {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     // 计算任务完成情况
     let completedDays = 0;
     let partialCompletedDays = 0;
-    const totalDays = days.length;
+    const totalDays = getDaysInMonth(currentDate); // 使用当月的实际天数
 
     days.forEach(day => {
       const todos = day.todos;

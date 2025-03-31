@@ -24,6 +24,9 @@ export async function GET(request: Request) {
         date: {
           gte: monthStart,
           lte: monthEnd
+        },
+        mood: {
+          isNot: null
         }
       },
       include: {
