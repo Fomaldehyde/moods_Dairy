@@ -5,7 +5,7 @@ import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // 设置本地化
 const locales = {
@@ -35,7 +35,19 @@ interface CalendarData {
 
 export default function CalendarPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get('date'); // 从 URL 中获取日期参数
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    return dateParam ? new Date(dateParam) : new Date(); // 初始化为 URL 中的日期或当前日期
+  });
+
+  useEffect(() => {
+    // 当 URL 中的日期参数变化时更新 selectedDate
+    if (dateParam) {
+      setSelectedDate(new Date(dateParam));
+    }
+  }, [dateParam]);
 
   useEffect(() => {
     const fetchCalendarData = async () => {
@@ -106,33 +118,24 @@ export default function CalendarPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] p-4">
+
+      {/* 日历视图 */}
       <Calendar
         localizer={localizer}
         events={events}
         startAccessor="start"
         endAccessor="end"
+        date={selectedDate} // 根据选中的日期切换视图
         style={{ height: '100%' }}
         onSelectEvent={handleSelectEvent}
         components={{
           event: EventComponent,
         }}
         eventPropGetter={eventStyleGetter}
-        messages={{
-          next: '下月',
-          previous: '上月',
-          today: '今天',
-          month: '月',
-          week: '周',
-          day: '日',
-          agenda: '议程',
-          date: '日期',
-          time: '时间',
-          event: '事件',
-          noEventsInRange: '没有记录',
-          showMore: (total) => `+${total} 更多`,
-        }}
-        className="text-sm [&_.rbc-date-cell]:text-2xl [&_.rbc-date-cell]:font-medium [&_.rbc-date-cell]:flex [&_.rbc-date-cell]:items-center [&_.rbc-date-cell]:justify-center [&_.rbc-off-range]:text-gray-300 [&_.rbc-off-range-bg]:bg-gray-50 [&_.rbc-today]:bg-blue-50 [&_.rbc-off-range+div]:opacity-0 [&_.rbc-month-view]:h-full [&_.rbc-row]:flex-1 [&_.rbc-row-content]:flex-1 [&_.rbc-row-content]:flex-col [&_.rbc-row-content]:justify-between [&_.rbc-date-cell]:h-full [&_.rbc-date-cell]:flex-col [&_.rbc-date-cell]:justify-between [&_.rbc-date-cell]:gap-1 [&_.rbc-event]:mt-auto [&_.rbc-event]:mb-1"
+        views={['month']}
+        toolbar={false}
+        className="text-sm [&_.rbc-date-cell]:text-2xl [&_.rbc-date-cell]:font-medium [&_.rbc-date-cell]:flex [&_.rbc-date-cell]:items-center [&_.rbc-date-cell]:justify-center [&_.rbc-off-range]:text-gray-300 [&_.rbc-off-range-bg]:bg-gray-50 [&_.rbc-today]:bg-blue-50 [&_.rbc-month-view]:h-full [&_.rbc-row]:flex-1 [&_.rbc-row-content]:flex-1 [&_.rbc-row-content]:flex-col [&_.rbc-row-content]:justify-between [&_.rbc-date-cell]:h-full [&_.rbc-date-cell]:flex-col [&_.rbc-date-cell]:justify-between [&_.rbc-date-cell]:gap-1 [&_.rbc-event]:mt-auto [&_.rbc-event]:mb-1"
       />
     </div>
   );
-} 
+}
