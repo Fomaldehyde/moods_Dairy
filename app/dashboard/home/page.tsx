@@ -1,148 +1,136 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  Chart as ChartJS, 
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-} from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
+import { format } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+import { moodEmojis } from '@/app/lib/mood';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-ChartJS.register(
-  ArcElement, 
-  Tooltip, 
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-);
+interface MoodStats {
+  moodStats: { [key: number]: number };
+  totalDays: number;
+  mostFrequentMood: number | null;
+  daysWithMood: number;
+}
 
-// 心情图标映射
-const moodEmojis: Record<string, string> = {
-  happy: "😊",
-  sad: "😢",
-  angry: "😠",
-  excited: "🤩",
-  tired: "😴",
-  neutral: "😐",
-};
+// 饼图颜色配置
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export default function HomePage() {
-  const [todoScore, setTodoScore] = useState(0);
-  const [dominantMood, setDominantMood] = useState("neutral");
-  const [habitStats, setHabitStats] = useState<{mood: string, count: number}[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentDate] = useState(new Date());
+  const [moodStats, setMoodStats] = useState<MoodStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 这里会从API获取数据，现在用模拟数据
-    const fetchData = async () => {
+    const fetchMoodStats = async () => {
       try {
-        // 模拟API调用延迟
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const userStr = localStorage.getItem('user');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
+        if (!user.id) return;
+
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        const response = await fetch(`/api/mood/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`);
+        const data = await response.json();
         
-        // 模拟数据
-        const mockMoodData = [
-          { mood: 'happy', count: 12 },
-          { mood: 'sad', count: 5 },
-          { mood: 'angry', count: 3 },
-          { mood: 'excited', count: 8 },
-          { mood: 'tired', count: 6 },
-          { mood: 'neutral', count: 10 },
-        ];
-        
-        // 找出占比最大的心情
-        const maxMood = mockMoodData.reduce((max, current) => 
-          current.count > max.count ? current : max, mockMoodData[0]);
-        
-        setHabitStats(mockMoodData);
-        setDominantMood(maxMood.mood);
-        
-        // 模拟Todo完成情况，计算分数
-        const totalTodos = 45;
-        const completedTodos = 37;
-        const score = Math.round((completedTodos / totalTodos) * 100);
-        setTodoScore(score);
-        
-        setIsLoading(false);
+        if (response.ok) {
+          setMoodStats(data);
+        }
       } catch (error) {
-        console.error('获取数据失败:', error);
-        setIsLoading(false);
+        console.error('获取心情统计失败:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    
-    fetchData();
-  }, []);
 
-  // 为图表准备数据
-  const moodChartData = {
-    labels: habitStats.map(item => `${moodEmojis[item.mood]} ${item.mood}`),
-    datasets: [
-      {
-        label: '天数',
-        data: habitStats.map(item => item.count),
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.6)',
-          'rgba(54, 162, 235, 0.6)',
-          'rgba(255, 206, 86, 0.6)',
-          'rgba(75, 192, 192, 0.6)',
-          'rgba(153, 102, 255, 0.6)',
-          'rgba(255, 159, 64, 0.6)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 206, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-          'rgba(255, 159, 64, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
+    fetchMoodStats();
+  }, [currentDate]);
+
+  const getMoodEmoji = (moodId: number) => {
+    const mood = Object.values(moodEmojis).find(m => m.id === moodId);
+    return mood ? mood.emoji : '🍃';
   };
 
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-full">加载中...</div>;
-  }
+  const getMoodLabel = (moodId: number) => {
+    const mood = Object.values(moodEmojis).find(m => m.id === moodId);
+    return mood ? mood.label : '未知';
+  };
+
+  // 准备饼图数据
+  const pieData = moodStats ? Object.entries(moodStats.moodStats).map(([moodId, count]) => ({
+    name: `${getMoodEmoji(parseInt(moodId))} ${getMoodLabel(parseInt(moodId))}`,
+    value: count,
+    moodId: parseInt(moodId)
+  })) : [];
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold">本月概览</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">心情统计</h2>
-          <div className="h-64">
-            <Doughnut data={moodChartData} />
-          </div>
-          <div className="mt-4 text-center">
-            <p className="text-lg">本月主要心情: {moodEmojis[dominantMood]} {dominantMood}</p>
-          </div>
-        </div>
+    <div className="p-4">
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-4">
+          {format(currentDate, 'yyyy年MM月', { locale: zhCN })}
+        </h2>
         
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">待办事项完成情况</h2>
-          <div className="flex flex-col items-center justify-center h-64">
-            <div className="relative w-48 h-48">
-              <div className="w-full h-full rounded-full bg-gray-200"></div>
-              <div 
-                className="absolute top-0 left-0 w-full h-full rounded-full bg-green-500"
-                style={{ 
-                  clipPath: `polygon(50% 50%, 50% 0%, ${todoScore >= 25 ? '100% 0%' : `${50 + 50 * todoScore / 25}% ${50 - 50 * todoScore / 25}%`}${todoScore >= 50 ? ', 100% 100%' : ''}${todoScore >= 75 ? ', 0% 100%' : ''}${todoScore >= 100 ? ', 0% 0%' : ''})` 
-                }}
-              ></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-4xl font-bold">{todoScore}</span>
+        {/* 心情统计卡片 */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold mb-4">本月心情统计</h3>
+          {loading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+            </div>
+          ) : moodStats ? (
+            <div className="space-y-4">
+              {/* 心情饼图 */}
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => [`${value}天`, '记录天数']}
+                      labelFormatter={(label) => label.split(' ')[1]} // 只显示心情文字，不显示表情
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* 统计信息 */}
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-500">记录天数</div>
+                  <div className="text-xl font-semibold">{moodStats.daysWithMood}天</div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-500">最多心情</div>
+                  <div className="text-xl font-semibold flex items-center">
+                    {moodStats.mostFrequentMood ? (
+                      <>
+                        <span className="mr-2">{getMoodEmoji(moodStats.mostFrequentMood)}</span>
+                        {getMoodLabel(moodStats.mostFrequentMood)}
+                      </>
+                    ) : (
+                      '暂无数据'
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="mt-4 text-lg">完成得分 (满分100)</p>
-          </div>
+          ) : (
+            <div className="text-center text-gray-500">
+              暂无心情数据
+            </div>
+          )}
         </div>
       </div>
     </div>

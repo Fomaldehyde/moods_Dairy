@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -35,7 +35,12 @@ export default function ChatPage() {
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [showMoodSelector, setShowMoodSelector] = useState(false);
   const [dayMood, setDayMood] = useState<DayMood>({ mood: null, moodId: null });
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // 当 URL 中的日期参数变化时更新 selectedDate
   useEffect(() => {
@@ -90,83 +95,88 @@ export default function ChatPage() {
     fetchMood();
   }, [selectedDate]);
 
-  // 加载日记条目
-  useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        // 从 localStorage 获取用户信息
-        const userStr = localStorage.getItem('user');
-        if (!userStr) {
-          console.error('用户未登录');
-          return;
-        }
-        const user = JSON.parse(userStr);
-        console.log('当前用户:', user);
+  // 加载聊天记录
+  const loadChats = useCallback(async (pageNum: number, isInitial: boolean = false) => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+      if (!user.id) return;
 
-        if (!user.id) {
-          console.error('用户信息不完整');
-          return;
-        }
-
-        // 1. 先获取或创建当天的 day 记录
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('获取日期记录:', dateStr, '选中的日期:', selectedDate.toISOString());
-        
-        const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        });
-        const dayData = await dayResponse.json();
-        
-        if (!dayResponse.ok) {
-          console.error('获取日期记录失败:', dayData);
-          if (dayResponse.status === 404) {
-            console.error('用户不存在，请重新登录');
-            return;
-          }
-          throw new Error(dayData.error || '获取日期记录失败');
-        }
-        
-        console.log('获取到的日期记录:', dayData);
-        
-        if (!dayData.day) {
-          console.log('没有找到日期记录，显示空列表');
-          setDiaryEntries([]);
-          return;
-        }
-
-        // 2. 获取该 day 的聊天记录
-        console.log('获取聊天记录，dayId:', dayData.day.id);
-        const chatResponse = await fetch(`/api/chat?dayId=${dayData.day.id}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        });
-        const chatData = await chatResponse.json();
-        
-        if (!chatResponse.ok) {
-          console.error('获取聊天记录失败:', chatData);
-          throw new Error(chatData.error || '获取聊天记录失败');
-        }
-        
-        console.log('获取到的聊天记录:', chatData.chats);
-        setDiaryEntries(chatData.chats || []);
-      } catch (error) {
-        console.error('获取日记失败:', error);
+      setIsLoading(true);
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // 1. 获取或创建当天的 day 记录
+      const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
+      const dayData = await dayResponse.json();
+      
+      if (!dayResponse.ok || !dayData.day) {
         setDiaryEntries([]);
+        setHasMore(false);
+        return;
       }
-    };
-    
-    fetchEntries();
+
+      // 2. 获取聊天记录
+      const chatResponse = await fetch(`/api/chat?dayId=${dayData.day.id}&page=${pageNum}&limit=20`);
+      const chatData = await chatResponse.json();
+      
+      if (!chatResponse.ok) {
+        throw new Error(chatData.error || '获取聊天记录失败');
+      }
+      
+      setDiaryEntries(prev => 
+        isInitial ? chatData.chats : [...prev, ...chatData.chats]
+      );
+      setHasMore(chatData.hasMore);
+    } catch (error) {
+      console.error('获取聊天记录失败:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [selectedDate]);
 
-  // 自动滚动到最新消息
+  // 初始加载
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [diaryEntries]);
+    setPage(1);
+    loadChats(1, true);
+  }, [selectedDate, loadChats]);
+
+  // 设置无限滚动观察器
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    const currentObserver = observerRef.current;
+    if (currentObserver) {
+      observer.observe(currentObserver);
+    }
+
+    return () => {
+      if (currentObserver) {
+        observer.unobserve(currentObserver);
+      }
+    };
+  }, [hasMore, isLoading]);
+
+  // 加载更多数据
+  useEffect(() => {
+    if (page > 1) {
+      loadChats(page, false);
+    }
+  }, [page, loadChats]);
+
+  // 发送新消息时滚动到底部
+  useEffect(() => {
+    if (messagesEndRef.current && page === 1) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [diaryEntries, page]);
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
@@ -313,9 +323,20 @@ export default function ChatPage() {
       </div>
       
       <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
           {diaryEntries.length > 0 ? (
             <div className="space-y-4">
+              {/* 加载更多指示器 */}
+              {isLoading && page > 1 && (
+                <div className="text-center py-4">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                </div>
+              )}
+              
+              {/* 无限滚动观察点 */}
+              <div ref={observerRef} className="h-4" />
+              
+              {/* 聊天记录 */}
               {diaryEntries.map((entry) => (
                 <div key={entry.id} className="flex flex-col max-w-[80%] ml-auto bg-blue-100 rounded-lg p-3">
                   <div className="flex items-center justify-end mb-1">
