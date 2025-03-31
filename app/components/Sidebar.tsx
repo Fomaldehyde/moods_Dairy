@@ -9,12 +9,9 @@ import {
   CheckCircleIcon, 
   ArrowLeftStartOnRectangleIcon 
 } from '@heroicons/react/24/outline';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import Cookies from 'js-cookie';
+import DateSelector from './DateSelector';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -57,19 +54,17 @@ export default function Sidebar() {
     }
   }, [dateParam]);
 
-  const handleDateChange = (date: Date | null) => {
-    if (date) {
-      setSelectedDate(date);
-      // 根据当前页面决定导航到哪个路径，但保持选中的日期
-      const formattedDate = formatDateForUrl(date);
-      if (pathname.includes('/dashboard/chat')) {
-        router.push(`/dashboard/chat?date=${formattedDate}`);
-      } else if (pathname.includes('/dashboard/todo')) {
-        router.push(`/dashboard/todo?date=${formattedDate}`);
-      } else {
-        // 默认导航到日历页面
-        router.push(`/dashboard/calendar?date=${formattedDate}`);
-      }
+  const handleDateChange = (date: Date) => {
+    setSelectedDate(date);
+    // 根据当前页面决定导航到哪个路径，但保持选中的日期
+    const formattedDate = formatDateForUrl(date);
+    if (pathname.includes('/dashboard/chat')) {
+      router.push(`/dashboard/chat?date=${formattedDate}`);
+    } else if (pathname.includes('/dashboard/todo')) {
+      router.push(`/dashboard/todo?date=${formattedDate}`);
+    } else {
+      // 默认导航到日历页面
+      router.push(`/dashboard/calendar?date=${formattedDate}`);
     }
   };
 
@@ -104,15 +99,9 @@ export default function Sidebar() {
       </div>
       
       <div className="p-4 border-b">
-        <div className="text-center mb-2">
-          {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })}
-        </div>
-        <DatePicker
-          selected={selectedDate}
+        <DateSelector
+          selectedDate={selectedDate}
           onChange={handleDateChange}
-          inline
-          locale={zhCN}
-          className="w-full"
         />
       </div>
       
