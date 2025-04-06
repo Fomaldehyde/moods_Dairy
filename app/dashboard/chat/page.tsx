@@ -24,6 +24,7 @@ export default function ChatPage() {
   
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [dayMood, setDayMood] = useState<DayMood>({ mood: null, moodId: null });
+  const [recalledContent, setRecalledContent] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -199,11 +200,18 @@ export default function ChatPage() {
         throw new Error(data.error || '发送消息失败');
       }
       
-      // 3. 更新消息列表
-      setDiaryEntries(prev => [...prev, data]);
-    } catch (error) {
-      console.error('发送消息失败:', error);
+    // 3. 更新消息列表
+    setDiaryEntries(prev => [...prev, data]);
+
+    // 4. 手动聚焦输入框
+    const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+    if (inputElement) {
+      inputElement.focus();
     }
+  } catch (error) {
+    console.error('发送消息失败:', error);
+  }
+    
   };
 
   const handleMoodSelect = async (moodKey: keyof typeof moodEmojis) => {
@@ -241,6 +249,43 @@ export default function ChatPage() {
     }
   };
 
+  const handleDeleteMessage = async (message: DiaryEntry) => {
+    try {
+      const response = await fetch(`/api/chat/${message.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('删除消息失败');
+      }
+
+      setDiaryEntries(prev => prev.filter(entry => entry.id !== message.id));
+    } catch (error) {
+      console.error('删除消息失败:', error);
+    }
+  };
+
+  const handleRecallMessage = async (message: DiaryEntry) => {
+    try {
+      // 保存消息内容
+      setRecalledContent(message.content);
+
+      // 删除消息
+      const response = await fetch(`/api/chat/${message.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('删除消息失败');
+      }
+
+      // 更新消息列表
+      setDiaryEntries(prev => prev.filter(entry => entry.id !== message.id));
+    } catch (error) {
+      console.error('撤回消息失败:', error);
+    }
+  };
+
   if (error) {
     return (
       <div className="p-4">
@@ -262,7 +307,12 @@ export default function ChatPage() {
       <div className="flex-1 overflow-y-auto mb-4 bg-gray-100 rounded-lg p-4" ref={chatContainerRef}>
         <div className="space-y-4">
           {diaryEntries.map((entry) => (
-            <ChatMessage key={entry.id} message={entry} />
+            <ChatMessage 
+              key={entry.id} 
+              message={entry} 
+              onDelete={handleDeleteMessage}
+              onRecall={handleRecallMessage}
+            />
           ))}
           
           {diaryEntries.length === 0 && !isLoading && (
@@ -287,6 +337,7 @@ export default function ChatPage() {
           onSubmit={handleSendMessage}
           placeholder="写下今天的心情..."
           buttonText="发送"
+          initialValue={recalledContent}
         />
       </div>
 
