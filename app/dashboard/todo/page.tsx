@@ -3,42 +3,21 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
-
-interface Todo {
-  id: number;
-  title: string;
-  completed: boolean;
-  dayId: number;
-  comments: TodoComment[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface TodoComment {
-  id: number;
-  content: string;
-  todoId: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import DateDisplay from '@/app/components/DateDisplay';
+import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
+import InputBox from '@/app/components/InputBox';
+import TodoItem from '@/app/components/TodoItem';
+import { Todo, TodoComment } from '@/app/lib/types';
 
 // 计算待办事项状态的颜色
-const getStatusColor = (todos: Todo[]): string => {
-  if (todos.length === 0) {
-    return 'bg-green-500'; // 没有待办事项显示绿色
-  }
-  
+const getStatusColor = (todos: Todo[]): 'green' | 'yellow' | 'red' => {
+  if (todos.length === 0) return 'green';
   const completedCount = todos.filter(todo => todo.completed).length;
   const totalCount = todos.length;
   
-  if (completedCount === 0) {
-    return 'bg-red-500'; // 有待办事项但一个都没完成显示红色
-  } else if (completedCount === totalCount) {
-    return 'bg-green-500'; // 全部完成显示绿色
-  } else {
-    return 'bg-yellow-500'; // 部分完成显示黄色
-  }
+  if (completedCount === 0) return 'red';
+  if (completedCount === totalCount) return 'green';
+  return 'yellow';
 };
 
 export default function TodoPage() {
@@ -53,9 +32,9 @@ export default function TodoPage() {
   });
   
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [newTodo, setNewTodo] = useState('');
-  const [newComment, setNewComment] = useState<{ [key: number]: string }>({});
-  const [editingTodo, setEditingTodo] = useState<{ id: number; title: string } | null>(null);
+  const [dayId, setDayId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 当 URL 中的日期参数变化时更新 selectedDate
   useEffect(() => {
@@ -67,99 +46,69 @@ export default function TodoPage() {
   // 加载待办事项
   useEffect(() => {
     const fetchTodos = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
-        // 从 localStorage 获取用户信息
         const userStr = localStorage.getItem('user');
-        if (!userStr) {
-          console.error('用户未登录');
-          return;
-        }
-        const user = JSON.parse(userStr);
-
-        if (!user.id) {
-          console.error('用户信息不完整');
-          return;
-        }
-
-        // 1. 先获取或创建当天的 day 记录
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('获取日期记录:', dateStr);
+        if (!userStr) throw new Error('用户未登录');
         
+        const user = JSON.parse(userStr);
+        if (!user.id) throw new Error('用户信息不完整');
+
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        
+        // 1. 获取或创建当天的 day 记录
         const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
         const dayData = await dayResponse.json();
         
         if (!dayResponse.ok) {
-          console.error('获取日期记录失败:', dayData);
-          if (dayResponse.status === 404) {
-            console.error('用户不存在，请重新登录');
-            return;
-          }
           throw new Error(dayData.error || '获取日期记录失败');
         }
         
         if (!dayData.day) {
-          console.log('没有找到日期记录，显示空列表');
           setTodos([]);
+          setDayId(null);
           return;
         }
+
+        setDayId(dayData.day.id);
 
         // 2. 获取该 day 的待办事项
         const todoResponse = await fetch(`/api/todo?dayId=${dayData.day.id}`);
         const todoData = await todoResponse.json();
         
         if (!todoResponse.ok) {
-          console.error('获取待办事项失败:', todoData);
           throw new Error(todoData.error || '获取待办事项失败');
         }
         
-        console.log('获取到的待办事项:', todoData.todos);
         setTodos(todoData.todos || []);
       } catch (error) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('获取数据失败');
+        }
         console.error('获取待办事项失败:', error);
         setTodos([]);
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchTodos();
   }, [selectedDate]);
 
-  const handleAddTodo = async () => {
-    if (!newTodo.trim()) return;
+  const handleAddTodo = async (title: string) => {
+    if (!dayId) return;
     
     try {
-      // 从 localStorage 获取用户信息
-      const userStr = localStorage.getItem('user');
-      if (!userStr) {
-        console.error('用户未登录');
-        return;
-      }
-      const user = JSON.parse(userStr);
-
-      if (!user.id) {
-        console.error('用户信息不完整');
-        return;
-      }
-
-      // 1. 先获取或创建当天的 day 记录
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const dayResponse = await fetch(`/api/day?date=${dateStr}&userId=${encodeURIComponent(user.id)}`);
-      const dayData = await dayResponse.json();
-      
-      if (!dayResponse.ok) {
-        throw new Error(dayData.error || '获取日期记录失败');
-      }
-      
-      if (!dayData.day) {
-        throw new Error('找不到对应的日期记录');
-      }
-
-      // 2. 创建新的待办事项
       const response = await fetch('/api/todo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: newTodo.trim(),
-          dayId: dayData.day.id
+          title,
+          dayId
         }),
       });
 
@@ -170,7 +119,6 @@ export default function TodoPage() {
       }
       
       setTodos([...todos, data.todo]);
-      setNewTodo('');
     } catch (error) {
       console.error('创建待办事项失败:', error);
     }
@@ -215,60 +163,6 @@ export default function TodoPage() {
     }
   };
 
-  const handleAddComment = async (todoId: number) => {
-    if (!newComment[todoId]?.trim()) return;
-    
-    try {
-      const response = await fetch('/api/todo/comment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: newComment[todoId].trim(),
-          todoId
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || '添加评论失败');
-      }
-      
-      setTodos(todos.map(todo => 
-        todo.id === todoId 
-          ? { ...todo, comments: [...todo.comments, data.comment] }
-          : todo
-      ));
-      setNewComment({ ...newComment, [todoId]: '' });
-    } catch (error) {
-      console.error('添加评论失败:', error);
-    }
-  };
-
-  const handleDeleteComment = async (todoId: number, commentId: number) => {
-    try {
-      const response = await fetch(`/api/todo/comment/${commentId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '删除评论失败');
-      }
-      
-      setTodos(todos.map(todo => 
-        todo.id === todoId 
-          ? { 
-              ...todo, 
-              comments: todo.comments.filter(comment => comment.id !== commentId)
-            }
-          : todo
-      ));
-    } catch (error) {
-      console.error('删除评论失败:', error);
-    }
-  };
-
   const handleEditTodo = async (todoId: number, newTitle: string) => {
     try {
       const response = await fetch(`/api/todo/${todoId}`, {
@@ -286,139 +180,117 @@ export default function TodoPage() {
       setTodos(todos.map(todo => 
         todo.id === todoId ? { ...todo, title: newTitle } : todo
       ));
-      setEditingTodo(null);
     } catch (error) {
       console.error('更新待办事项失败:', error);
     }
   };
 
-  return (
-    <div className="h-full flex flex-col">
-      <div className="bg-white rounded-lg shadow mb-4 p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">
-            {format(selectedDate, 'yyyy年MM月dd日', { locale: zhCN })}
-          </h1>
-          <div className={`w-4 h-4 rounded-full ${getStatusColor(todos)}`}></div>
-        </div>
-      </div>
+  const handleAddComment = async (todoId: number, content: string) => {
+    try {
+      const response = await fetch(`/api/todo/${todoId}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+
+      const data = await response.json();
       
-      <div className="flex-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div className="flex-1 p-4 overflow-y-auto">
-          {todos.length > 0 ? (
-            <div className="space-y-4">
-              {todos.map((todo) => (
-                <div key={todo.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={todo.completed}
-                        onChange={(e) => handleToggleTodo(todo.id, e.target.checked)}
-                        className="w-5 h-5"
-                      />
-                      {editingTodo?.id === todo.id ? (
-                        <input
-                          type="text"
-                          value={editingTodo.title}
-                          onChange={(e) => setEditingTodo({ ...editingTodo, title: e.target.value })}
-                          onBlur={() => handleEditTodo(todo.id, editingTodo.title)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleEditTodo(todo.id, editingTodo.title);
-                            }
-                          }}
-                          className="border rounded px-2 py-1"
-                          autoFocus
-                        />
-                      ) : (
-                        <span className={todo.completed ? 'line-through text-gray-500' : ''}>
-                          {todo.title}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setEditingTodo({ id: todo.id, title: todo.title })}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTodo(todo.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 space-y-2">
-                    {todo.comments.map((comment) => (
-                      <div key={comment.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1">
-                        <span className="text-sm">{comment.content}</span>
-                        <button
-                          onClick={() => handleDeleteComment(todo.id, comment.id)}
-                          className="text-gray-500 hover:text-red-700"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={newComment[todo.id] || ''}
-                        onChange={(e) => setNewComment({ ...newComment, [todo.id]: e.target.value })}
-                        placeholder="添加评论..."
-                        className="flex-1 border rounded px-2 py-1 text-sm"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleAddComment(todo.id);
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => handleAddComment(todo.id)}
-                        className="text-blue-500 hover:text-blue-700"
-                      >
-                        添加
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              今天还没有待办事项，添加一个吧...
-            </div>
-          )}
-        </div>
-        
-        <div className="border-t p-4">
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="添加新的待办事项..."
-              className="flex-1 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddTodo();
-                }
-              }}
-            />
-            <button
-              onClick={handleAddTodo}
-              className="bg-blue-500 text-white rounded px-4 py-2 hover:bg-blue-600"
-              disabled={!newTodo.trim()}
-            >
-              添加
-            </button>
+      if (!response.ok) {
+        throw new Error(data.error || '添加评论失败');
+      }
+      
+      setTodos(todos.map(todo => 
+        todo.id === todoId 
+          ? { ...todo, comments: [...todo.comments, data.comment] }
+          : todo
+      ));
+    } catch (error) {
+      console.error('添加评论失败:', error);
+    }
+  };
+
+  const handleDeleteComment = async (todoId: number, commentId: number) => {
+    try {
+      const response = await fetch(`/api/todo/${todoId}/comment/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || '删除评论失败');
+      }
+      
+      setTodos(todos.map(todo => 
+        todo.id === todoId 
+          ? { ...todo, comments: todo.comments.filter(c => c.id !== commentId) }
+          : todo
+      ));
+    } catch (error) {
+      console.error('删除评论失败:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-4">
+        <div className="animate-pulse">
+          <div className="h-8 w-48 bg-gray-200 rounded mb-4"></div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-lg shadow p-4">
+                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">加载失败！</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-6">
+        <DateDisplay date={selectedDate} />
+        <MoodStatusDisplay status={getStatusColor(todos)} moodId={null} />
+      </div>
+
+      <div className="mb-6">
+        <InputBox
+          onSubmit={handleAddTodo}
+          placeholder="添加新的待办事项..."
+          buttonText="添加"
+        />
+      </div>
+
+      <div className="space-y-4">
+        {todos.map((todo) => (
+          <TodoItem
+            key={todo.id}
+            {...todo}
+            onToggle={handleToggleTodo}
+            onDelete={handleDeleteTodo}
+            onEdit={handleEditTodo}
+            onAddComment={handleAddComment}
+            onDeleteComment={handleDeleteComment}
+          />
+        ))}
+        
+        {todos.length === 0 && (
+          <div className="text-center text-gray-500 py-8">
+            暂无待办事项
+          </div>
+        )}
       </div>
     </div>
   );

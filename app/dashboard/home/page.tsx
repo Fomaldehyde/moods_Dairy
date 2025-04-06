@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { moodEmojis } from '@/app/lib/mood';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import HomePageSkeleton from '@/app/components/Skeletons/HomePageSkeleton';
 
 interface MoodStats {
   moodStats: { [key: number]: number };
@@ -27,11 +28,30 @@ interface HomePageProps {
   selectedDate?: Date;
 }
 
+// 预加载数据函数
+const prefetchData = async (userId: string, date: string) => {
+  const urls = [
+    `/api/mood/stats?userId=${encodeURIComponent(userId)}&date=${date}`,
+    `/api/todo/stats?userId=${encodeURIComponent(userId)}&date=${date}`
+  ];
+  
+  return Promise.all(urls.map(url => 
+    fetch(url, {
+      // 添加预加载头
+      headers: {
+        'Purpose': 'prefetch',
+        'Cache-Control': 'max-age=300' // 缓存5分钟
+      }
+    })
+  ));
+};
+
 export default function HomePage({ selectedDate }: HomePageProps) {
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date());
   const [moodStats, setMoodStats] = useState<MoodStats | null>(null);
   const [todoStats, setTodoStats] = useState<TodoStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 当选择的日期改变时更新 currentDate
   useEffect(() => {
@@ -40,31 +60,67 @@ export default function HomePage({ selectedDate }: HomePageProps) {
     }
   }, [selectedDate]);
 
+  // 数据预加载
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    
+    const user = JSON.parse(userStr);
+    if (!user.id) return;
+
+    // 预加载下个月的数据
+    const nextMonth = new Date(currentDate);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const nextMonthStr = format(nextMonth, 'yyyy-MM-dd');
+    prefetchData(user.id, nextMonthStr).catch(console.error);
+  }, [currentDate]);
+
+  // 获取当前数据
   useEffect(() => {
     const fetchStats = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
         const userStr = localStorage.getItem('user');
-        if (!userStr) return;
+        if (!userStr) throw new Error('用户未登录');
+        
         const user = JSON.parse(userStr);
-        if (!user.id) return;
+        if (!user.id) throw new Error('用户信息不完整');
 
         const dateStr = format(currentDate, 'yyyy-MM-dd');
         
-        // 获取心情统计
-        const moodResponse = await fetch(`/api/mood/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`);
-        const moodData = await moodResponse.json();
+        // 使用 AbortController 处理请求取消
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10秒超时
         
-        // 获取任务统计
-        const todoResponse = await fetch(`/api/todo/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`);
-        const todoData = await todoResponse.json();
+        const [moodResponse, todoResponse] = await Promise.all([
+          fetch(`/api/mood/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`, {
+            signal: controller.signal
+          }),
+          fetch(`/api/todo/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`, {
+            signal: controller.signal
+          })
+        ]);
         
-        if (moodResponse.ok) {
-          setMoodStats(moodData);
-        }
-        if (todoResponse.ok) {
-          setTodoStats(todoData);
-        }
+        clearTimeout(timeout);
+        
+        if (!moodResponse.ok) throw new Error('获取心情统计失败');
+        if (!todoResponse.ok) throw new Error('获取任务统计失败');
+        
+        const [moodData, todoData] = await Promise.all([
+          moodResponse.json(),
+          todoResponse.json()
+        ]);
+        
+        setMoodStats(moodData);
+        setTodoStats(todoData);
       } catch (error) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('获取数据失败');
+        }
         console.error('获取统计数据失败:', error);
       } finally {
         setLoading(false);
@@ -91,6 +147,23 @@ export default function HomePage({ selectedDate }: HomePageProps) {
     moodId: parseInt(moodId)
   })) : [];
 
+  // 如果正在加载，显示骨架屏
+  if (loading) {
+    return <HomePageSkeleton />;
+  }
+
+  // 如果有错误，显示错误信息
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">加载失败！</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
       <div className="mb-8">
@@ -102,11 +175,7 @@ export default function HomePage({ selectedDate }: HomePageProps) {
           {/* 心情统计卡片 */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">本月心情统计</h3>
-            {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-              </div>
-            ) : moodStats ? (
+            {moodStats ? (
               <div className="space-y-4">
                 {/* 心情饼图 */}
                 <div className="h-64">
@@ -165,11 +234,7 @@ export default function HomePage({ selectedDate }: HomePageProps) {
           {/* 任务完成情况卡片 */}
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold mb-4">本月任务完成情况</h3>
-            {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-              </div>
-            ) : todoStats ? (
+            {todoStats ? (
               <div className="space-y-4">
                 {/* 进度条 */}
                 <div className="relative pt-1">
