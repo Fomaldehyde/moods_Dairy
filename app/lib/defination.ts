@@ -23,6 +23,7 @@ export type Mood = {
   id: number;
   label: string;
   emoji: string;
+  weight: number;
 };
 
 export type User = {

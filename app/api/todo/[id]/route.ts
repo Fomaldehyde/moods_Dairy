@@ -49,7 +49,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
+    const id = parseInt(await params.id);
 
     if (!id) {
       return NextResponse.json(
@@ -58,11 +58,12 @@ export async function DELETE(
       );
     }
 
+    // 删除待办事项
     await prisma.todo.delete({
       where: { id },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ message: '删除成功' });
   } catch (error) {
     console.error('删除待办事项失败:', error);
     return NextResponse.json(

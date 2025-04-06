@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect} from 'react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { moodEmojis } from '@/app/lib/mood';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import HomePageSkeleton from '@/app/components/Skeletons/HomePageSkeleton';
 
 interface MoodStats {
@@ -12,6 +12,14 @@ interface MoodStats {
   totalDays: number;
   mostFrequentMood: number | null;
   daysWithMood: number;
+}
+
+interface MoodTrend {
+  date: string;
+  moodId: number | null;
+  emoji: string | null;
+  label: string | null;
+  weight: number | null;
 }
 
 interface TodoStats {
@@ -50,6 +58,7 @@ export default function HomePage({ selectedDate }: HomePageProps) {
   const [currentDate, setCurrentDate] = useState(selectedDate || new Date());
   const [moodStats, setMoodStats] = useState<MoodStats | null>(null);
   const [todoStats, setTodoStats] = useState<TodoStats | null>(null);
+  const [moodTrend, setMoodTrend] = useState<MoodTrend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,11 +103,14 @@ export default function HomePage({ selectedDate }: HomePageProps) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000); // 10秒超时
         
-        const [moodResponse, todoResponse] = await Promise.all([
+        const [moodResponse, todoResponse, trendResponse] = await Promise.all([
           fetch(`/api/mood/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`, {
             signal: controller.signal
           }),
           fetch(`/api/todo/stats?userId=${encodeURIComponent(user.id)}&date=${dateStr}`, {
+            signal: controller.signal
+          }),
+          fetch(`/api/mood/trend?userId=${encodeURIComponent(user.id)}`, {
             signal: controller.signal
           })
         ]);
@@ -107,14 +119,20 @@ export default function HomePage({ selectedDate }: HomePageProps) {
         
         if (!moodResponse.ok) throw new Error('获取心情统计失败');
         if (!todoResponse.ok) throw new Error('获取任务统计失败');
+        if (!trendResponse.ok) throw new Error('获取心情趋势失败');
         
-        const [moodData, todoData] = await Promise.all([
+        const [moodData, todoData, trendData] = await Promise.all([
           moodResponse.json(),
-          todoResponse.json()
+          todoResponse.json(),
+          trendResponse.json()
         ]);
         
         setMoodStats(moodData);
         setTodoStats(todoData);
+        setMoodTrend(trendData.map((item: Omit<MoodTrend, 'weight'>) => ({
+          ...item,
+          weight: item.moodId ? Object.values(moodEmojis).find(m => m.id === item.moodId)?.weight || null : null
+        })));
       } catch (error) {
         if (error instanceof Error) {
           setError(error.message);
@@ -227,6 +245,46 @@ export default function HomePage({ selectedDate }: HomePageProps) {
             ) : (
               <div className="text-center text-gray-500">
                 暂无心情数据
+              </div>
+            )}
+          </div>
+
+          {/* 心情趋势卡片 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4">最近10天心情趋势</h3>
+            {moodTrend.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={moodTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(date) => date.split('-').slice(1).join('-')}
+                    />
+                    <YAxis 
+                      domain={[0, 9]}
+                      tickCount={10}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => {
+                        const mood = Object.values(moodEmojis).find(m => m.weight === value);
+                        return [mood ? `${mood.emoji} ${mood.label}` : '无记录', '心情'];
+                      }}
+                      labelFormatter={(label) => label}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="weight" 
+                      stroke="#8884d8" 
+                      dot={true}
+                      activeDot={{ r: 8 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500">
+                暂无心情趋势数据
               </div>
             )}
           </div>
