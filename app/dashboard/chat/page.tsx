@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { moodEmojis } from '@/app/lib/mood';
 import DateDisplay from '@/app/components/DateDisplay';
 import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
@@ -264,7 +263,6 @@ export default function ChatPage() {
         throw new Error(data.error || '更新心情失败');
       }
 
-      const data = await response.json();
       setDayMood({
         mood: moodEmojis[moodKey].emoji,
         moodId: moodEmojis[moodKey].id

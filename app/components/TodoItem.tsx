@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
-import { Todo, TodoComment } from '@/app/lib/types';
+import {  TodoComment } from '@/app/lib/types';
 
 interface TodoItemProps {
   id: number;
@@ -23,7 +21,7 @@ export default function TodoItem({
   title,
   completed,
   comments,
-  createdAt,
+
   onToggle,
   onDelete,
   onEdit,

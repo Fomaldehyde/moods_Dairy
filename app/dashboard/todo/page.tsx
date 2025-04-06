@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { Todo } from '@/app/lib/types';
 import DateDisplay from '@/app/components/DateDisplay';
 import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
@@ -269,23 +268,6 @@ export default function TodoPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="p-4">
-        <div className="animate-pulse">
-          <div className="h-8 w-48 bg-gray-200 rounded mb-4"></div>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-lg shadow p-4">
-                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="p-4">
@@ -319,12 +301,6 @@ export default function TodoPage() {
         {todos.length === 0 && !loading && (
           <div className="text-center text-gray-500 py-8">
             暂无待办事项
-          </div>
-        )}
-        
-        {loading && (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mx-auto"></div>
           </div>
         )}
       </div>
