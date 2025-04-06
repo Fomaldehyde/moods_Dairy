@@ -13,7 +13,11 @@ import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import DateSelector from './DateSelector';
 
-export default function Sidebar() {
+interface SidebarProps {
+  onDateSelect?: (date: Date) => void;
+}
+
+export default function Sidebar({ onDateSelect }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,12 +54,15 @@ export default function Sidebar() {
   // 当URL日期参数变化时更新选中日期
   useEffect(() => {
     if (dateParam) {
-      setSelectedDate(new Date(dateParam));
+      const newDate = new Date(dateParam);
+      setSelectedDate(newDate);
+      onDateSelect?.(newDate);
     }
-  }, [dateParam]);
+  }, [dateParam, onDateSelect]);
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
+    onDateSelect?.(date);
     // 根据当前页面决定导航到哪个路径，但保持选中的日期
     const formattedDate = formatDateForUrl(date);
     if (pathname.includes('/dashboard/chat')) {

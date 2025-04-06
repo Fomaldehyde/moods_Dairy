@@ -23,11 +23,22 @@ interface TodoStats {
 // 饼图颜色配置
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
-export default function HomePage() {
-  const [currentDate] = useState(new Date());
+interface HomePageProps {
+  selectedDate?: Date;
+}
+
+export default function HomePage({ selectedDate }: HomePageProps) {
+  const [currentDate, setCurrentDate] = useState(selectedDate || new Date());
   const [moodStats, setMoodStats] = useState<MoodStats | null>(null);
   const [todoStats, setTodoStats] = useState<TodoStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // 当选择的日期改变时更新 currentDate
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentDate(selectedDate);
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     const fetchStats = async () => {

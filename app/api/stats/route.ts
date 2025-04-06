@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserIdFromAuth } from '@/lib/auth';
+import { startOfMonth, endOfMonth, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 
 // 获取统计数据
 export async function GET(request: Request) {
@@ -25,45 +26,76 @@ export async function GET(request: Request) {
     
     const [year, month] = yearMonth.split('-').map(Number);
     
-    // 设置月份范围
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+    // 设置月份范围（使用UTC时间）
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    startDate.setUTCHours(0, 0, 0, 0);
+    
+    const endDate = new Date(Date.UTC(year, month, 0));
+    endDate.setUTCHours(23, 59, 59, 999);
     
     // 获取心情统计
-    const diaries = await prisma.diary.findMany({
+    const daysWithMood = await prisma.day.findMany({
       where: {
         userId,
         date: {
           gte: startDate,
           lte: endDate,
         },
+        mood: {
+          isNot: null
+        }
       },
-      select: {
-        mood: true,
-        date: true,
-      },
+      include: {
+        mood: true
+      }
     });
     
     // 计算每种心情的天数
     const moodCounts: Record<string, number> = {};
-    diaries.forEach(diary => {
-      moodCounts[diary.mood] = (moodCounts[diary.mood] || 0) + 1;
+    daysWithMood.forEach((day) => {
+      if (day.mood) {
+        const moodId = day.mood.id.toString();
+        moodCounts[moodId] = (moodCounts[moodId] || 0) + 1;
+      }
     });
     
     // 获取待办事项完成情况
-    const todos = await prisma.todo.findMany({
+    const days = await prisma.day.findMany({
       where: {
         userId,
         date: {
           gte: startDate,
           lte: endDate,
-        },
+        }
       },
+      include: {
+        todos: true
+      }
     });
     
-    const totalTodos = todos.length;
-    const completedTodos = todos.filter(todo => todo.completed).length;
-    const todoScore = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
+    // 计算任务完成情况
+    let completedDays = 0;
+    let partialCompletedDays = 0;
+    const totalDays = days.length;
+    
+    days.forEach(day => {
+      const todos = day.todos;
+      if (todos.length === 0) {
+        completedDays++; // 没有待办事项的日期计入全部完成
+      } else {
+        const completedTodos = todos.filter(todo => todo.completed).length;
+        const completionRate = completedTodos / todos.length;
+        
+        if (completionRate === 1) {
+          completedDays++;
+        } else if (completionRate > 0) {
+          partialCompletedDays++;
+        }
+      }
+    });
+    
+    // 计算任务得分
+    const todoScore = totalDays > 0 ? Math.round(((completedDays + partialCompletedDays * 0.5) / totalDays) * 100) : 0;
     
     // 找出占比最大的心情
     let dominantMood = 'neutral';
@@ -83,8 +115,9 @@ export async function GET(request: Request) {
       })),
       dominantMood,
       todoStats: {
-        total: totalTodos,
-        completed: completedTodos,
+        total: totalDays,
+        completed: completedDays,
+        partialCompleted: partialCompletedDays,
         score: todoScore,
       },
     });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 
 export async function GET(request: Request) {
   try {
@@ -12,10 +12,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
     }
 
-    // 解析日期，获取当月第一天和最后一天
+    // 解析日期，获取当月第一天和最后一天（使用UTC时间）
     const currentDate = new Date(date);
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
+    const year = currentDate.getUTCFullYear();
+    const month = currentDate.getUTCMonth();
+    
+    // 计算当月的第一天和最后一天（使用 UTC 时间）
+    const monthStart = new Date(Date.UTC(year, month, 1));
+    monthStart.setUTCHours(0, 0, 0, 0); // 设置为当天的 00:00:00 UTC
+    
+    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+    monthEnd.setUTCHours(23, 59, 59, 999); // 设置为当天的 23:59:59 UTC
 
     // 获取当月所有有心情记录的日期
     const daysWithMood = await prisma.day.findMany({

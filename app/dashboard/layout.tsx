@@ -1,16 +1,28 @@
+'use client';
+
 import Sidebar from '../components/Sidebar';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import HomePage from './home/page';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const pathname = usePathname();
+  const isHomePage = pathname === '/dashboard/home';
+
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
+      <Sidebar onDateSelect={setSelectedDate} />
       <main className="flex-1 p-6 overflow-auto">
-        {children}
+        {isHomePage ? (
+          <HomePage selectedDate={selectedDate} />
+        ) : (
+          children
+        )}
       </main>
     </div>
   );
