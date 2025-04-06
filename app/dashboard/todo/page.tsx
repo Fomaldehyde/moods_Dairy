@@ -187,10 +187,10 @@ export default function TodoPage() {
 
   const handleAddComment = async (todoId: number, content: string) => {
     try {
-      const response = await fetch(`/api/todo/${todoId}/comment`, {
+      const response = await fetch('/api/todo/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, todoId }),
       });
 
       const data = await response.json();
@@ -211,7 +211,7 @@ export default function TodoPage() {
 
   const handleDeleteComment = async (todoId: number, commentId: number) => {
     try {
-      const response = await fetch(`/api/todo/${todoId}/comment/${commentId}`, {
+      const response = await fetch(`/api/todo/comment/${commentId}`, {
         method: 'DELETE',
       });
 

@@ -111,18 +111,13 @@ export default function TodoItem({
 
       {/* 评论列表 */}
       {comments.length > 0 && (
-        <div className="mt-4 space-y-2">
+        <div className="mt-2 space-y-2">
           {comments.map((comment) => (
-            <div key={comment.id} className="flex items-start space-x-2 text-sm">
-              <div className="flex-1 bg-gray-50 p-2 rounded">
-                <div className="text-gray-600">{comment.content}</div>
-                <div className="text-xs text-gray-400 mt-1">
-                  {format(new Date(comment.createdAt), 'MM-dd HH:mm', { locale: zhCN })}
-                </div>
-              </div>
+            <div key={comment.id} className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+              <span className="flex-1">{comment.content}</span>
               <button
                 onClick={() => onDeleteComment(id, comment.id)}
-                className="text-gray-400 hover:text-red-500"
+                className="text-red-500 hover:text-red-700"
               >
                 删除
               </button>

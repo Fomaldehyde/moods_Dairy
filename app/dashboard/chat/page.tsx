@@ -9,6 +9,7 @@ import DateDisplay from '@/app/components/DateDisplay';
 import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
 import InputBox from '@/app/components/InputBox';
 import { DiaryEntry, DayMood } from '@/app/lib/types';
+import ChatMessage from '@/app/components/ChatMessage';
 
 export default function ChatPage() {
   const searchParams = useSearchParams();
@@ -199,7 +200,7 @@ export default function ChatPage() {
       }
       
       // 3. 更新消息列表
-      setDiaryEntries(prev => [data.chat, ...prev]);
+      setDiaryEntries(prev => [...prev, data]);
     } catch (error) {
       console.error('发送消息失败:', error);
     }
@@ -258,15 +259,10 @@ export default function ChatPage() {
         <MoodStatusDisplay moodId={dayMood.moodId} />
       </div>
 
-      <div className="flex-1 overflow-y-auto mb-4" ref={chatContainerRef}>
+      <div className="flex-1 overflow-y-auto mb-4 bg-gray-100 rounded-lg p-4" ref={chatContainerRef}>
         <div className="space-y-4">
           {diaryEntries.map((entry) => (
-            <div key={entry.id} className="bg-white rounded-lg shadow p-4">
-              <div className="text-gray-800">{entry.content}</div>
-              <div className="text-xs text-gray-400 mt-2">
-                {format(new Date(entry.createdAt), 'HH:mm', { locale: zhCN })}
-              </div>
-            </div>
+            <ChatMessage key={entry.id} message={entry} />
           ))}
           
           {diaryEntries.length === 0 && !isLoading && (
