@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { moodEmojis } from '@/app/lib/mood';
@@ -10,6 +10,31 @@ import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
 import InputBox from '@/app/components/InputBox';
 import { DiaryEntry, DayMood } from '@/app/lib/types';
 import ChatMessage from '@/app/components/ChatMessage';
+import { ChatSkeleton } from '@/app/components/Skeleton';
+
+// 将消息列表抽取为单独的组件
+function ChatMessages({ 
+  diaryEntries, 
+  onDelete, 
+  onRecall 
+}: { 
+  diaryEntries: DiaryEntry[]; 
+  onDelete: (message: DiaryEntry) => void;
+  onRecall: (message: DiaryEntry) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {diaryEntries.map((entry) => (
+        <ChatMessage 
+          key={entry.id} 
+          message={entry} 
+          onDelete={onDelete}
+          onRecall={onRecall}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function ChatPage() {
   const searchParams = useSearchParams();
@@ -305,31 +330,28 @@ export default function ChatPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto mb-4 bg-gray-100 rounded-lg p-4" ref={chatContainerRef}>
-        <div className="space-y-4">
-          {diaryEntries.map((entry) => (
-            <ChatMessage 
-              key={entry.id} 
-              message={entry} 
-              onDelete={handleDeleteMessage}
-              onRecall={handleRecallMessage}
-            />
-          ))}
-          
-          {diaryEntries.length === 0 && !isLoading && (
-            <div className="text-center text-gray-500 py-8">
-              暂无日记记录
-            </div>
-          )}
-          
-          {isLoading && (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mx-auto"></div>
-            </div>
-          )}
-          
-          <div ref={observerRef} className="h-4" />
-          <div ref={messagesEndRef} />
-        </div>
+        <Suspense fallback={<ChatSkeleton />}>
+          <ChatMessages 
+            diaryEntries={diaryEntries} 
+            onDelete={handleDeleteMessage}
+            onRecall={handleRecallMessage}
+          />
+        </Suspense>
+        
+        {diaryEntries.length === 0 && !isLoading && (
+          <div className="text-center text-gray-500 py-8">
+            暂无日记记录
+          </div>
+        )}
+        
+        {isLoading && (
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+          </div>
+        )}
+        
+        <div ref={observerRef} className="h-4" />
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="mb-4">

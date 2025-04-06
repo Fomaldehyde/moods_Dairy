@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+import { Todo } from '@/app/lib/types';
 import DateDisplay from '@/app/components/DateDisplay';
 import MoodStatusDisplay from '@/app/components/MoodStatusDisplay';
 import InputBox from '@/app/components/InputBox';
 import TodoItem from '@/app/components/TodoItem';
-import { Todo, TodoComment } from '@/app/lib/types';
+import { TodoSkeleton } from '@/app/components/Skeletons/TodoSkeleton';
 
 // 计算待办事项状态的颜色
 const getStatusColor = (todos: Todo[]): 'green' | 'yellow' | 'red' => {
@@ -19,6 +21,43 @@ const getStatusColor = (todos: Todo[]): 'green' | 'yellow' | 'red' => {
   if (completedCount === totalCount) return 'green';
   return 'yellow';
 };
+
+// 将待办事项列表抽取为单独的组件
+function TodoList({ 
+  todos, 
+  onToggle, 
+  onDelete, 
+  onEdit, 
+  onAddComment, 
+  onDeleteComment 
+}: { 
+  todos: Todo[];
+  onToggle: (id: number, completed: boolean) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
+  onEdit: (id: number, newTitle: string) => Promise<void>;
+  onAddComment: (todoId: number, content: string) => Promise<void>;
+  onDeleteComment: (todoId: number, commentId: number) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-4">
+      {todos.map((todo) => (
+        <TodoItem
+          key={todo.id}
+          id={todo.id}
+          title={todo.title}
+          completed={todo.completed}
+          comments={todo.comments}
+          createdAt={todo.createdAt}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          onAddComment={onAddComment}
+          onDeleteComment={onDeleteComment}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function TodoPage() {
   const searchParams = useSearchParams();
@@ -259,38 +298,43 @@ export default function TodoPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <DateDisplay date={selectedDate} />
-        <MoodStatusDisplay status={getStatusColor(todos)} moodId={null} />
+        <MoodStatusDisplay moodId={null} status={getStatusColor(todos)} />
       </div>
 
-      <div className="mb-6">
-        <InputBox
-          onSubmit={handleAddTodo}
-          placeholder="添加新的待办事项..."
-          buttonText="添加"
-        />
-      </div>
-
-      <div className="space-y-4">
-        {todos.map((todo) => (
-          <TodoItem
-            key={todo.id}
-            {...todo}
+      <div className="flex-1 overflow-y-auto mb-4">
+        <Suspense fallback={<TodoSkeleton />}>
+          <TodoList
+            todos={todos}
             onToggle={handleToggleTodo}
             onDelete={handleDeleteTodo}
             onEdit={handleEditTodo}
             onAddComment={handleAddComment}
             onDeleteComment={handleDeleteComment}
           />
-        ))}
+        </Suspense>
         
-        {todos.length === 0 && (
+        {todos.length === 0 && !loading && (
           <div className="text-center text-gray-500 py-8">
             暂无待办事项
           </div>
         )}
+        
+        {loading && (
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mx-auto"></div>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-4">
+        <InputBox
+          onSubmit={handleAddTodo}
+          placeholder="添加新的待办事项..."
+          buttonText="添加"
+        />
       </div>
     </div>
   );
